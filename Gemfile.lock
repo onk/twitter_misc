@@ -2,9 +2,11 @@ GEM
   remote: https://rubygems.org/
   specs:
     dotenv (2.0.1)
+    oauth (0.4.7)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
   dotenv
+  oauth
