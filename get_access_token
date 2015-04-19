@@ -1,0 +1,25 @@
+#!/usr/bin/env ruby
+
+# USAGE:
+#   bundle exec ./get_access_token
+
+Bundler.require
+Dotenv.load
+
+consumer = OAuth::Consumer.new(
+  ENV["CONSUMER_KEY"],
+  ENV["CONSUMER_SECRET"],
+  site: "https://api.twitter.com",
+)
+request_token = consumer.get_request_token
+
+puts request_token.authorize_url
+system("open", request_token.authorize_url) || puts("ブラウザから上記の URL を開いて PIN を取得、入力してください")
+
+print "PIN: "
+oauth_verifier = gets.chomp.strip
+
+access_token = request_token.get_access_token(oauth_verifier: oauth_verifier)
+
+puts "ACCESS_TOKEN=#{access_token.token}"
+puts "ACCESS_TOKEN_SECRET=#{access_token.secret}"
