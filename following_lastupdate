@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+
+# follow している人の中から30日以上更新がない人をリストアップする
+#
+# USAGE:
+#   bundle exec ./following_lastupdate
+
+Bundler.require
+Dotenv.load
+require "date"
+require "fileutils"
+
+consumer = OAuth::Consumer.new(
+  ENV["CONSUMER_KEY"],
+  ENV["CONSUMER_SECRET"],
+  site: "https://api.twitter.com",
+)
+access_token = OAuth::AccessToken.new(
+  consumer,
+  ENV["ACCESS_TOKEN"],
+  ENV["ACCESS_TOKEN_SECRET"],
+)
+
+cursor = -1
+loop do
+  p "....#{cursor}......"
+  url = "https://api.twitter.com/1.1/friends/list.json?cursor=#{cursor}"
+  now = Time.now
+  response = access_token.get(url)
+  FileUtils.mkdir_p("tmp")
+  File.open("tmp/following_lastupdate.log", "a") do |f|
+    f.puts "---"
+    f.puts "request_at: #{now.iso8601}"
+    f.puts "url: #{url}"
+    f.puts "---"
+    f.puts response.body
+  end
+
+  data = JSON.parse(response.body)
+  break if data["users"].empty?
+
+  data["users"].each do |user|
+    if user["status"] and (Date.parse(user["status"]["created_at"]) < Date.today - 30)
+      puts "@#{user["screen_name"]} (#{user["name"]}) po:#{user["statuses_count"]}, li:#{user["listed_count"]}, fr:#{user["friends_count"]}, fo:#{user["followers_count"]}"
+    end
+  end
+
+  sleep 60
+  cursor = data["next_cursor"]
+end
