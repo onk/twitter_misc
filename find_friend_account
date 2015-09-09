@@ -1,0 +1,70 @@
+#!/usr/bin/env ruby
+
+# 知り合いっぽい人のアカウントを見つける
+# 確実に顔見知りと判断できる人複数人から follow されているってことは
+# おそらく知り合いだろうという考え方。
+#
+# USAGE:
+#   bundle exec ./find_friend_account
+
+Bundler.require
+Dotenv.load
+require "fileutils"
+
+consumer = OAuth::Consumer.new(
+  ENV["CONSUMER_KEY"],
+  ENV["CONSUMER_SECRET"],
+  site: "https://api.twitter.com",
+)
+$access_token = OAuth::AccessToken.new(
+  consumer,
+  ENV["ACCESS_TOKEN"],
+  ENV["ACCESS_TOKEN_SECRET"],
+)
+
+def main
+  accounts_count_hash = {}
+  File.read("friends.txt").each_line do |line|
+    screen_name = line.chomp
+
+    get_following_accounts(screen_name).each do |id|
+      accounts_count_hash[id] ||= 0
+      accounts_count_hash[id] += 1
+    end
+    sleep 60
+  end
+
+  File.open("tmp/maybe_friends.txt", "w") do |f|
+    accounts_count_hash.sort_by{|k,v|-v}.each do |id, count|
+      f.puts "#{id}\t#{count}"
+    end
+  end
+
+  i = 0
+  accounts_count_hash.sort_by{|k,v|-v}.each_slice(50) do |a|
+    hash = Hash[a]
+    user_ids = hash.keys
+    break if hash.values.last < 3
+    url = "https://api.twitter.com/1.1/users/lookup.json?user_id=#{user_ids.join(",")}"
+    response = $access_token.get(url)
+    data = JSON.parse(response.body)
+    File.open("tmp/hoge_#{i}.log", "w") { |f| f.puts data }
+    data.each do |user|
+      puts user["screen_name"]
+    end
+    i += 1
+  end
+end
+
+def get_following_accounts(screen_name)
+  puts "....#{screen_name}......"
+  url = "https://api.twitter.com/1.1/friends/ids.json?screen_name=#{screen_name}&count=5000&cursor=-1"
+  response = $access_token.get(url)
+  data = JSON.parse(response.body)
+  if data["errors"]
+    raise data["errors"].map{|err| err["message"]}.join(", ")
+  end
+  Array(data["ids"])
+end
+
+main
